@@ -1,0 +1,244 @@
+if [[ "$(uname)" == "Darwin" ]]; then
+	DIALOG="./dialog-mac"
+	IP=`ifconfig | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | awk 'NR==2{print $2}'`
+elif [[ "$(uname)" == "Linux" ]]; then
+	DIALOG="./dialog"
+	IP=`ip -o -4 addr show scope global | awk '{split($4, a, "/"); print a[1]}' | head -n 1`
+else
+  echo "Système non pris en charge : $(uname)"
+fi
+
+declare -A VAR
+VAR=([APP_NAME]='PONG'
+	[DB_USER]=''
+	[DB_PASSWORD]=''
+	[DB_NAME]=''
+	[DB_IP]=$IP
+	[DB_PORT]=5432
+	[DB_BINARY_TARGET]="\"native\", \"debian-openssl-3.0.x\""
+	[DB_URL]=''
+	[CLIENT_ID]='u-s4t2ud-5e584383cf39097ccc4e6fb3f781c2132b4f1c617d3f49e7ad3c6fbcb2745bbf'
+	[CLIENT_SECRET]='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'
+	[CLIENT_NEXT_SECRET]=''
+	[CALLBACK_URL]="http://$IP:3000/auth/42/callback"
+	[JWT_SECRET]=''
+	[TWO_FA_APP]='FTT_TRANS'
+	[URL]=$IP
+	[PUBLIC_URL]=$IP
+	[HOST_FRONT]=$IP
+	[HOST_BACK]=$IP
+	[PORT_FRONT]=5173
+	[PORT_BACK]=3000
+	[HOST_IP]=$IP
+	[HOST_NS]=$IP
+	[MIN_PASSWORD_LENGTH]=6
+	[MAX_POINT_GAME]=11
+	[MAX_PAUSE_GAME]=3
+
+	[PUBLIC_HOST_BACK]=${VAR[HOST_BACK]}
+	[PUBLIC_FRONTEND_IP]=${VAR[HOST_FRONT]}
+	[PUBLIC_PORT_BACK]=${VAR[PORT_BACK]}
+	[PUBLIC_FRONTEND_PORT]=${VAR[PORT_FRONT]}
+
+	[POSTGRES_IP]=${VAR[DB_IP]}
+	[POSTGRES_PORT]=${VAR[DB_PORT]}
+	[POSTGRES_DB]=${VAR[DB_NAME]}
+	[POSTGRES_USER]=${VAR[DB_USER]}
+	[POSTGRES_PASSWORD]=${VAR[DB_PASSWORD]})
+
+ask_question() {
+	local title=$2
+  $DIALOG --backtitle "Configurateur des fichiers d'environement" --title "$title" --inputbox "$1" 10 60 2>tempfile
+  response=$(cat tempfile)
+	if [ ! -z "$response" ]; then
+		VAR["$4"]=$response
+		echo "$4=$response" >> $output_file
+	else
+		if [ "$4" = "DB_BINARY_TARGET" ]; then
+			echo "$4='[${VAR["$4"]}]'" >> $output_file
+		else
+			echo "$4=${VAR["$4"]}" >> $output_file
+		fi
+	fi
+ rm -f tempfile
+}
+
+ask_password() {
+	local title=$2
+  $DIALOG --backtitle "Configurateur des fichiers d'environement" --title "$title" --insecure --passwordbox "$1" 10 60 2>tempfile
+  response=$(cat tempfile)
+  if [ ! -z "$response" ]; then
+		VAR["$4"]=$response
+		echo "$4=$response" >> $output_file
+	else
+		echo "$4=P455W0RD_N0T_S3T!" >> $output_file
+	fi
+    rm -f tempfile
+}
+
+info_box() {
+	local title=$1
+		$DIALOG --backtitle "Configurateur des fichiers d'environement" --title "$title" --msgbox "Veuillez remplir les informations suivante jusqu'a la fin du questionnaire.\n\n\
+Un resume des elements vous sera propose pour la validation. Apres validation les fichiers seront crees automatiquement.\n\n\
+Il ne vous restera plus qu'a taper \"docker compose up --build\" dans votre console pour lancer la procedure d'installation et effectuer le lancement automatique des containers." 18 60
+}
+
+backend() {
+	output_file="./backend/app/.env"
+
+	info_box "Configuration du backend"
+  ask_question "\nNom de l'application" "Nom" "Backend" "APP_NAME"
+  ask_question "\nAdresse IP du backend [${VAR[HOST_BACK]}]" "BACKEND_IP" "Backend" "HOST_BACK"
+  ask_question "\nAdresse IP du frontend [${VAR[HOST_FRONT]}]" "FRONTEND_IP" "Backend" "HOST_FRONT"
+  ask_question "\nAdresse IP de la base Postgres [${VAR[DB_IP]}]" "POSTGRES_IP" "Backend" "DB_IP"
+	ask_question "\nPort de l'API backend [${VAR[PORT_BACK]}]" "BACKEND_PORT" "Backend" "PORT_BACK"
+	ask_question "\nPort du frontend [${VAR[PORT_FRONT]}]" "FRONTEND_PORT" "Backend" "PORT_FRONT"
+	ask_question "\nPort de la base Postgres [${VAR[DB_PORT]}]" "POSTGRES_PORT" "Backend" "DB_PORT"
+	ask_question "\nNom de la base Postgres" "POSTGRES_DB" "Backend" "DB_NAME"
+	ask_question "\nNom d'utilisateur de la base Postgres" "POSTGRES_USER" "Backend" "DB_USER"
+	ask_password "\nMot de passe de la base Postgres" "POSTGRES_PASSWORD" "Backend" "DB_PASSWORD"
+	ask_question "\nConnecteur de la base Postgres [${VAR[DB_BINARY_TARGET]}]" "DB_BINARY_TARGET" "Backend" "DB_BINARY_TARGET"
+	ask_question "\nCle API42 [${VAR[CLIENT_ID]}]" "API42_KEY" "Backend" "CLIENT_ID"
+	ask_question "\nSecret API42 [${VAR[CLIENT_SECRET]}]" "API42_SECRET" "Backend" "CLIENT_SECRET"
+	ask_question "\nCallback API42 [${VAR[CALLBACK_URL]}]" "API42_CALLBACK" "Backend" "CALLBACK_URL"
+	ask_question "\nCle secret jwt" "JWT_SECRET" "Backend" "JWT_SECRET"
+	ask_question "\nNom d'application 2FA [${VAR[TWO_FA_APP]}]" "TWO_FA_APP" "Backend" "TWO_FA_APP"
+	ask_question "\nLongeur minimum du mot de passe [${VAR[MIN_PASSWORD_LENGTH]}]" "MIN_PASSWORD_LENGTH" "Backend" "MIN_PASSWORD_LENGTH"
+	ask_question "\nNombre de point pour gagner une partie [${VAR[MAX_POINT_GAME]}]" "MAX_POINT_GAME" "Backend" "MAX_POINT_GAME"
+	ask_question "\nNombre de pause maximum par partie [${VAR[MAX_PAUSE_GAME]}]" "MAX_PAUSE_GAME" "Backend" "MAX_PAUSE_GAME"
+
+  $DIALOG --backtitle "Configurateur des fichiers d'environement" --yesno "Recapitulatif des informations :\n\
+	APP_NAME: ${VAR[APP_NAME]}\n
+	HOST_BACK: ${VAR[HOST_BACK]}\n
+	HOST_FRONT: ${VAR[HOST_FRONT]}\n
+	DB_IP: ${VAR[DB_IP]}\n
+	PORT_BACK: ${VAR[PORT_BACK]}\n
+	PORT_FRONT: ${VAR[PORT_FRONT]}\n
+	DB_PORT: ${VAR[DB_PORT]}\n
+	DB_NAME: ${VAR[DB_NAME]}\n
+	DB_USER: ${VAR[DB_USER]}\n
+	DB_PASSWORD: ${VAR[DB_PASSWORD]}\n
+	DB_BINARY_TARGET: ${VAR[DB_BINARY_TARGET]}\n
+	CLIENT_ID: ${VAR[CLIENT_ID]}\n
+	CLIENT_SECRET: ${VAR[CLIENT_SECRET]}\n
+	CALLBACK_URL: ${VAR[CALLBACK_URL]}\n
+	JWT_SECRET: ${VAR[JWT_SECRET]}\n
+	TWO_FA_APP: ${VAR[TWO_FA_APP]}\n
+	MIN_PASSWORD_LENGTH: ${VAR[MIN_PASSWORD_LENGTH]}\n
+	MAX_POINT_GAME: ${VAR[MAX_POINT_GAME]}\n
+	MAX_PAUSE_GAME: ${VAR[MAX_PAUSE_GAME]}" 30 60
+  response=$?
+  if [ $response -eq 0 ]; then
+		echo DB_URL=postgresql://${VAR[DB_USER]}:${VAR[DB_PASSWORD]}@${VAR[DB_IP]}:${VAR[DB_PORT]}/${VAR[DB_NAME]}?schema=public >> $output_file
+    $DIALOG --backtitle "Configurateur des fichiers d'environement" --msgbox "Informations enregistrées dans $output_file" 8 40
+    break
+  else
+    rm $output_file
+  fi
+}
+
+frontend() {
+	output_file="./frontend/app/.env"
+	VAR[PUBLIC_HOST_BACK]=${VAR[HOST_BACK]}
+	VAR[PUBLIC_FRONTEND_IP]=${VAR[HOST_FRONT]}
+	VAR[PUBLIC_PORT_BACK]=${VAR[PORT_BACK]}
+	VAR[PUBLIC_FRONTEND_PORT]=${VAR[PORT_FRONT]}
+
+	info_box "Tous les fichiers"
+  ask_question "\nAdresse IP du backend [${VAR[HOST_BACK]}]" "BACKEND_IP" "Backend/frontend" "PUBLIC_HOST_BACK"
+  ask_question "\nAdresse IP du frontend [${VAR[PUBLIC_FRONTEND_IP]}]" "FRONTEND_IP" "Backend/frontend" "PUBLIC_FRONTEND_IP"
+	ask_question "\nPort du backend [${VAR[PORT_BACK]}]" "BACKEND_PORT" "Backend/frontend" "PUBLIC_PORT_BACK"
+	ask_question "\nPort du frontend [${VAR[PUBLIC_FRONTEND_PORT]}]" "FRONTEND_PORT" "Backend/frontend" "PUBLIC_FRONTEND_PORT"
+  $DIALOG --backtitle "Configurateur des fichiers d'environement" --yesno "Recapitulatif des informations :\n\n\
+	PUBLIC_HOST_BACK: ${VAR[PUBLIC_HOST_BACK]}\n
+	PUBLIC_FRONTEND_IP: ${VAR[PUBLIC_FRONTEND_IP]}\n
+	PUBLIC_PORT_BACK: ${VAR[PUBLIC_PORT_BACK]}\n
+	PUBLIC_FRONTEND_PORT: ${VAR[PUBLIC_FRONTEND_PORT]}\n" 45 80
+  response=$?
+  if [ $response -eq 0 ]; then
+    $DIALOG --msgbox "Informations enregistrées dans $output_file" 8 40
+    break
+  else
+    rm $output_file
+  fi
+}
+
+postgres() {
+	mkdir postgres
+	mkdir postgres/data
+	output_file="./postgres/.env"
+	VAR[POSTGRES_IP]=${VAR[DB_IP]}
+	VAR[POSTGRES_PORT]=${VAR[DB_PORT]}
+	VAR[POSTGRES_DB]=${VAR[DB_NAME]}
+	VAR[POSTGRES_USER]=${VAR[DB_USER]}
+	VAR[POSTGRES_PASSWORD]=${VAR[DB_PASSWORD]}
+
+	info_box "Tous les fichiers"
+  ask_question "\nAdresse IP de la base Postgres [${VAR[POSTGRES_IP]}]" "POSTGRES_IP" "Backend/BDD" "POSTGRES_IP"
+	ask_question "\nPort de la base Postgres [${VAR[POSTGRES_PORT]}]" "POSTGRES_PORT" "Backend/BDD" "POSTGRES_PORT"
+	ask_question "\nNom de la base Postgres [${VAR[POSTGRES_DB]}]" "POSTGRES_DB" "Backend/BDD" "POSTGRES_DB"
+	ask_question "\nNom d'utilisateur de la base Postgres [${VAR[POSTGRES_USER]}]" "POSTGRES_USER" "Backend/BDD" "POSTGRES_USER"
+	ask_password "\nMot de passe de la base Postgres" "POSTGRES_PASSWORD" "Backend/BDD" "POSTGRES_PASSWORD"
+  $DIALOG --backtitle "Configurateur des fichiers d'environement" --yesno "Recapitulatif des informations :\n\n\
+		POSTGRES_IP: ${VAR[POSTGRES_IP]}\n
+		POSTGRES_PORT: ${VAR[POSTGRES_PORT]}\n
+		POSTGRES_DB: ${VAR[POSTGRES_DB]}\n
+		POSTGRES_USER: ${VAR[POSTGRES_USER]}\n
+		POSTGRES_PASSWORD: ${VAR[POSTGRES_PASSWORD]}\n" 45 80
+  response=$?
+  if [ $response -eq 0 ]; then
+	#enregistrement du fichier .env dans postgres
+    $DIALOG --msgbox "Informations enregistrées dans $output_file" 8 40
+    break
+  else
+    rm $output_file
+  fi
+}
+
+main() {
+	while true; do
+		selection=$($DIALOG --backtitle "Configurateur des fichiers d'environement" --title "Configuration des environements" --menu "\nMenu de sélection:"\
+		14 50 4 \
+	 	1 "Configuration pour tous les containers" \
+		2 "Configuration de l'API backend" \
+		3 "Configuration du frontend" \
+		4 "Configuration de la base postgres" \
+		5 "Quitter" 2>&1 > /dev/tty)
+
+case $selection in
+  1)
+		backend
+		frontend
+		postgres
+		$DIALOG --backtitle "Configurateur des fichiers d'environement" --msgbox "Avant de lancer docker compose verifiez bien que les fichiers d'environement sont bien presents dans les dossier backend/app, frontend/app et postgres. Verifiez egalement les redirection de port dans le fichier docker-compose.yml" 9 40
+		break
+		;;
+	2)
+		backend
+		main
+		break
+		;;
+	3)
+		frontend
+		main
+		break
+		;;
+	4)
+		postgres
+		main
+		break
+     ;;
+	5)
+		$DIALOG --backtitle "Configurateur des fichiers d'environement" --msgbox "Avant de lancer docker compose verifiez bien que les fichiers d'environement sont bien presents dans les dossier backend/app, frontend/app et postgres. Verifiez egalement les redirection de port dans le fichier docker-compose.yml" 9 40
+		clear
+		exit 0
+		;;
+	*)
+		clear
+		exit 0	
+		;;
+		esac
+done
+}
+main
+clear

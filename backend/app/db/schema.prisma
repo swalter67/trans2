@@ -1,0 +1,158 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = env("DB_BINARY_TARGET")
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DB_URL")
+}
+
+model Users {
+  id          String   @id @default(uuid())
+  username    String   @unique @db.VarChar(32)
+  first_name  String   @db.VarChar(32)
+  last_name   String   @db.VarChar(32)
+  avatar_url  String   @db.VarChar(2048)
+  password    String?  @db.Text
+  intra_login String?  @unique @db.VarChar(32)
+  email       String?  @db.VarChar(320)
+  cookie_w    String?  @db.Text
+  fa_key      String?  @db.VarChar(255)
+  fa_uri      String?  @db.VarChar(2048) //Not really need
+  fa_verify   Boolean? @default(false)
+  fa_actived  Boolean  @default(false)
+  created     DateTime @default(now())
+  last_co     DateTime @default(now()) @updatedAt()
+  medal       Medal    @default(VIDE)
+  level       Float     @default(0)
+
+  play_time   Int               @default(0)
+  bloked      Users[]           @relation("bloked")
+  blokedBy    Users[]           @relation("bloked")
+  // Relation
+  win         Games[]           @relation("winner")
+  loose       Games[]           @relation("looser")
+  friendAsk   Friends[]         @relation("friendAsk")
+  friendAsked Friends[]         @relation("friendAsked")
+  member      Members[]
+  achivment   AchievmentMedal[] @relation("user")
+  //message			Messages[] // Bad Idea
+}
+
+model AchievmentMedal {
+  id     Int         @id @default(autoincrement())
+  userId String
+  userF  Users       @relation("user", fields: [userId], references: [id])
+  achId  Int
+  pourcent  Int
+  achF  Achivements @relation(fields: [achId], references: [id])
+ 
+}
+
+model Games {
+  id           Int      @id @default(autoincrement())
+  scoreWin     Int
+  scoreLose    Int
+  long_echange Int
+  rebond_max   Int
+  ecar_max     Int
+  bonus_score  Float
+  duree        Int
+  time         DateTime @default(now())
+  winnerId     String
+  looserId     String
+  // Reference
+  winnerIdF    Users    @relation("winner", fields: [winnerId], references: [id])
+  looserOdF    Users    @relation("looser", fields: [looserId], references: [id])
+}
+
+model Friends {
+  id           Int      @id @default(autoincrement())
+  friendAsker  String
+  friendAsked  String
+  accepted     Boolean
+  date         DateTime @default(now())
+  // Reference
+  friendAskerF Users    @relation("friendAsk", fields: [friendAsker], references: [id])
+  friendAskedF Users    @relation("friendAsked", fields: [friendAsked], references: [id])
+}
+
+model Rooms {
+  id          Int          @id @default(autoincrement())
+  name        String       @unique @db.VarChar(64)
+  password    String?      @db.Text
+  description String?      @db.Text
+  avatar      String?      @db.VarChar(255)
+  privacy     RoomsPrivacy @default(PUBLIC)
+  // Relation
+  message     Messages[]
+  member      Members[]
+}
+
+model Messages {
+  id      Int      @id @default(autoincrement())
+  message String   @db.Text
+  read    Boolean
+  roomId  Int
+  date    DateTime @default(now())
+  membre  Int
+  // Reference
+  membreF Members  @relation(fields: [membre], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  //sendIdF			Users			@relation(fields: [sendId], references: [id]) // Bad idea
+  roomIdF Rooms    @relation(fields: [roomId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model Members {
+  id     Int           @id @default(autoincrement())
+  roomId Int
+  userId String
+  role   MenmbresRole  @default(MEMBER)
+  status MembresStatus @default(ALLOW)
+  time DateTime @default(now())
+  
+  // Relation
+  message Messages[]
+  // Reference
+  roomIdF Rooms      @relation(fields: [roomId], references: [id])
+  userIdF Users      @relation(fields: [userId], references: [id])
+}
+
+model Achivements {
+  id             Int               @id @default(autoincrement())
+  name           String            @db.Text
+  long_echange   Int
+  rebond_echange Int
+  ecard_max      Int
+  duree          Int
+  score_win      Int
+  score_loose    Int
+  max_score      Int
+  achF          AchievmentMedal[]
+}
+
+enum MenmbresRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum MembresStatus {
+  ALLOW
+  BAN
+  MUTE
+  ASK
+}
+
+enum RoomsPrivacy {
+  PUBLIC
+  PRIVATE
+}
+
+enum Medal {
+  VIDE
+  BRONZE
+  ARGENT
+  OR
+  PLATINIUM
+}
